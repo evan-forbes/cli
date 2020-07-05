@@ -5,10 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
+
+	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2/disc"
 )
 
 var (
@@ -93,6 +97,9 @@ type App struct {
 	// i.e. foobar -o -v -> foobar -ov
 	UseShortOptionHandling bool
 
+	// Disc
+	Disc *disc.Server
+
 	didSetup bool
 }
 
@@ -109,7 +116,11 @@ func compileTime() time.Time {
 // NewApp creates a new cli Application with some reasonable defaults for Name,
 // Usage, Version and Action.
 func NewApp() *App {
-	return &App{
+	srv, err := disc.New(filepath.Base(os.Args[0]))
+	if err != nil {
+		log.Fatal(err)
+	}
+	app := &App{
 		Name:         filepath.Base(os.Args[0]),
 		HelpName:     filepath.Base(os.Args[0]),
 		Usage:        "A new cli application",
@@ -119,8 +130,34 @@ func NewApp() *App {
 		Compiled:     compileTime(),
 		Writer:       os.Stdout,
 		ErrWriter:    os.Stderr,
+		Disc:         srv,
 	}
+
+	// bootFlags are the flags for boo
+	bootFlags := []cli.Flag{
+		&cli.StringFlag{
+			Name:  "config, c",
+			Value: "",
+			Usage: "*optional* path to config file (.json)",
+		},
+	}
+
+	// subcommands
+	app.Commands = []*cli.Command{
+		{
+			Name:   "boot",
+			Usage:  "start forwarding discord messages to appropriate commands",
+			Flags:  bootFlags,
+			Action: cmd.Boot,
+		},
+	}
+	return app
 }
+
+// TODO:
+// be able to "port" a cli by simply changing the import
+
+// change the setup function to make an app that connects to the discord.Writer and discord.Reader
 
 // Setup runs initialization code to ensure all data structures are ready for
 // `Run` or inspection prior to `Run`.  It is internally called by `Run`, but
@@ -201,6 +238,7 @@ func (a *App) Setup() {
 	if a.Metadata == nil {
 		a.Metadata = make(map[string]interface{})
 	}
+	return
 }
 
 func (a *App) newFlagSet() (*flag.FlagSet, error) {
