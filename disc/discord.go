@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
 )
 
 // usuage
@@ -45,15 +45,16 @@ so I need to modify cli.App
 // Server listens for discord messages and forwards incoming commands via the
 // cli.App.RunContext()
 type Server struct {
-	disc *discordgo.Session
-	ctx  context.Context
-	name string
-	Msgs chan Convo
+	disc    *discordgo.Session
+	ctx     context.Context
+	name    string
+	waiting map[string]*Slug
+	Sink    chan Slug
 }
 
 // New inits a connection to the discord server with provided creds
-func New(name string) (*Server, error) {
-	crds, err := creds()
+func New(ctx context.Context, name string) (*Server, error) {
+	crds, err := configs()
 	if err != nil {
 		return nil, errors.Wrap(err, "failure to read creds during server init")
 	}
@@ -64,76 +65,103 @@ func New(name string) (*Server, error) {
 	}
 	out := Server{
 		disc: dg,
+		ctx:  ctx,
 	}
+	out.disc.AddHandler(out.mainHandler)
 	return &out, nil
 }
 
-// Boot is the cli command that is added (or at least should be added)to all
-// apps in order to switch the discord server on to begin forwarding parsed messages to app.RunContext
-func (s *Server) Boot(ctx *cli.Context) error {
-	// listen for ctrl + c
-	mngr := NewManager(contetxt.Background)
-	s.ctx = mngr.Ctx
-	go mngr.Listen()
-	s.disc.AddHandler(s.mainHandler)
-	// Listen for discord Messages
-	go s.Listen()
-	mngr.WG.Wait()
-	return nil
-}
-
+// mainHandler filters messages from discord passing all qualifying messages as
+// command line input into an instance of the app
 func (s *Server) mainHandler(ss *discordgo.Session, m *discordgo.MessageCreate) {
-	// ignore everything that doesn't include the command
-	if !strings.Contains(m.Content, fmt.Sprintf("!%s", s.name)) {
+	// discord app name
+	name := fmt.Sprintf("!%s", s.name)
+	// ignore self posts
+	if m.Author.ID == ss.State.User.ID {
 		return
 	}
+	// check is the server is waiting on a response from the user
+	waitingSlug, has := s.waiting[fmt.Sprintf("%s%s", m.ChannelID, m.Author.Username)]
+	if has {
+		// forward response to the slug
+		waitingSlug.Response <- m.Content
+		return
+	}
+	// ignore everything else that doesn't include the command
+	if !strings.Contains(m.Content, name) {
+		return
+	}
+	// do a quick parse for args
+	index := strings.Index(m.Content, name)
+	args := strings.Split(m.Content[index+len(name):], " ")
+	// create a new slug
+	slug := s.NewSlug(m, args)
 
+	// pass the args to app.RunContext
+	s.Sink <- *slug
 }
 
 //////////////////////////////////////////////////
 //  	Conversations
 ///////////////////////////////////////////////
-/* Conversions allow commands to wait for user input
 
-msg in -> msg
-write a response back
-out <- msg
-and wait for another response
- in -> msg
-
-either that or make a specific pipe reader and writer?
-
-*/
-
-// Convo allows commands to wait for user input
-type Convo struct {
-	id    string
-	User  string
-	Write chan string
-	Read  chan string
+// Slug contains data pertaining to a conversation with a user and fullfills the
+// io.Reader and io.Writer interfaces
+type Slug struct {
+	ChanID   string
+	User     string
+	Args     []string
+	srv      *Server
+	Response chan string
 }
 
-func (c *Convo) Write(msg string) {
-
+// NewSlug issues a *Slug
+func (s *Server) NewSlug(m *discordgo.MessageCreate, args []string) *Slug {
+	id := fmt.Sprintf("%s%s", m.Author.Username, m.ChannelID)
+	return &Slug{ChanID: id, User: m.Author.Username, srv: s, Args: args}
 }
 
-// type Phrase struct {
-// 	ChanID string
+// ID combines the user's name and channel id to identify a conversion
+func (s *Slug) ID() string {
+	return fmt.Sprintf("%s%s", s.ChanID, s.User)
+}
 
-// }
+// Write fullfills the io.Writer interface, writing the provided []byte to the
+// discord channel of origin
+func (s *Slug) Write(in []byte) (int, error) {
+	_, err := s.srv.disc.ChannelMessageSend(s.ChanID, string(in))
+	return len(in), err
+}
+
+// Read fullfills the io.Reader interface, which asks the discord channel of
+// origin for input
+func (s *Slug) Read(out []byte) (int, error) {
+	// notify the server
+	s.srv.waiting[s.ID()] = s
+	select {
+	case resp := <-s.Response:
+		out = []byte(resp)
+		return len(out), nil
+	case <-time.After(time.Minute):
+		s.Write([]byte("no input detected, aborting"))
+		return 0, errors.New("user did not respond within 1 minute, aborting")
+	}
+}
+
+// func (s *Slug) WritePNG() {}
 
 //////////////////////////////////////////////////
 //  fetching credentials
 ///////////////////////////////////////////////
-type cred struct {
+type config struct {
 	Permissions int    `json:"BOT_PERMISSIONS"`
 	Token       string `json:"TOKEN"`
 	ClientID    string `json:"CLIENT_ID"`
 }
 
 // TODO: change this
-func creds() (*cred, error) {
-	var out cred
+func configs() (*config, error) {
+	var out config
 	// Ask to unlock credentials
 
 	jsonFile, err := ioutil.ReadFile("/home/evan/.creds/discord.json")
@@ -148,8 +176,10 @@ func creds() (*cred, error) {
 }
 
 // Listen opens websocket streaming from discord
-func (s *Server) Listen(ctx context.Context) {
+func (s *Server) Listen(mngr *Manager) {
+	defer mngr.WG.Done()
 	s.disc.Open()
-	<-ctx.Done()
+	<-mngr.Ctx.Done()
+	close(s.Sink)
 	s.disc.Close()
 }

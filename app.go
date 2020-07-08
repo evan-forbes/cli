@@ -5,13 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
-	"github.com/urfave/cli"
 	"github.com/urfave/cli/v2/disc"
 )
 
@@ -113,13 +111,49 @@ func compileTime() time.Time {
 	return info.ModTime()
 }
 
+// TODO: connect the server sink to the booted app
+// 1) modify cli.Context to be able to open a convo... like be able to wait on messages
+// 2) look into connecting fmt.Println to discord directly
+// 3) don't do any of that because making identical discord and cli apps is not really that valuable...
+// 3b) I mean, you're going to have do something for any data viz commands any way.
+// 4) then again it would be really nice to just fmt.Println and/or ask for input
+// 3) I'd look at buffio.NewScanner(io.Reader)
+
+// BootCmd is the cli command that is added to all apps in order to switch the
+// discord server on to begin forwarding parsed messages to app.RunContext
+func BootCmd(app *App) ActionFunc {
+	return func(ctx *Context) error {
+		// init the server
+		mngr := disc.NewManager(context.Background(), nil)
+		srv, err := disc.New(mngr.Ctx, filepath.Base(os.Args[0]))
+		if err != nil {
+			return err
+		}
+
+		// Listen for cancels via ctrl + C
+		go mngr.Listen()
+
+		// Listen for discord Messages
+		mngr.WG.Add(1)
+		go srv.Listen(mngr)
+
+		// pass qualifying messages to the app
+		go func() {
+			for slug := range srv.Sink {
+				ctx, _ := context.WithTimeout(mngr.Ctx, time.Second*70)
+				app.RunContext(ctx, slug.Args)
+			}
+		}()
+
+		// wait until everything is done
+		mngr.WG.Wait()
+		return nil
+	}
+}
+
 // NewApp creates a new cli Application with some reasonable defaults for Name,
 // Usage, Version and Action.
 func NewApp() *App {
-	srv, err := disc.New(filepath.Base(os.Args[0]))
-	if err != nil {
-		log.Fatal(err)
-	}
 	app := &App{
 		Name:         filepath.Base(os.Args[0]),
 		HelpName:     filepath.Base(os.Args[0]),
@@ -130,38 +164,34 @@ func NewApp() *App {
 		Compiled:     compileTime(),
 		Writer:       os.Stdout,
 		ErrWriter:    os.Stderr,
-		Disc:         srv,
 	}
 
 	// bootFlags are the flags for boo
-	bootFlags := []cli.Flag{
-		&cli.StringFlag{
+	bootFlags := []Flag{
+		&StringFlag{
 			Name:  "config, c",
 			Value: "",
 			Usage: "*optional* path to config file (.json)",
 		},
+		&IntFlag{
+			Name:  "timeout, t",
+			Value: 30,
+			Usage: "*optional* set a timeout for each command, default of 30 seconds",
+		},
 	}
 
 	// subcommands
-	app.Commands = []*cli.Command{
+	app.Commands = []*Command{
 		{
 			Name:   "boot",
 			Usage:  "start forwarding discord messages to appropriate commands",
 			Flags:  bootFlags,
-			Action: cmd.Boot,
+			Action: BootCmd(app),
 		},
 	}
 	return app
 }
 
-// TODO:
-// be able to "port" a cli by simply changing the import
-
-// change the setup function to make an app that connects to the discord.Writer and discord.Reader
-
-// Setup runs initialization code to ensure all data structures are ready for
-// `Run` or inspection prior to `Run`.  It is internally called by `Run`, but
-// will return early if setup has already happened.
 func (a *App) Setup() {
 	if a.didSetup {
 		return
