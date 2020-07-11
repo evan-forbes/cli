@@ -18,17 +18,11 @@ type Manager struct {
 	WG       *sync.WaitGroup
 	Interupt chan os.Signal
 	doneC    chan struct{}
-	// LogFile  *json.Encoder
 }
 
 // NewManager return a pointer to a setup manager.
 func NewManager(superctx context.Context, wg *sync.WaitGroup) *Manager {
 	ctx, cancel := context.WithCancel(superctx)
-	// f, err := os.OpenFile("file.Log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	// if err != nil {
-	// 	fmt.Println("problem creating log file")
-	// 	cancel()
-	// }
 	if wg == nil {
 		wg = &sync.WaitGroup{}
 	}
@@ -38,7 +32,6 @@ func NewManager(superctx context.Context, wg *sync.WaitGroup) *Manager {
 		WG:       wg,
 		Interupt: make(chan os.Signal),
 		doneC:    make(chan struct{}, 1),
-		// LogFile:  json.NewEncoder(f),
 	}
 	return mnger
 }

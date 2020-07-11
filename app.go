@@ -112,20 +112,27 @@ func compileTime() time.Time {
 }
 
 // TODO: connect the server sink to the booted app
-// 1) modify cli.Context to be able to open a convo... like be able to wait on messages
-// 2) look into connecting fmt.Println to discord directly
-// 3) don't do any of that because making identical discord and cli apps is not really that valuable...
-// 3b) I mean, you're going to have do something for any data viz commands any way.
-// 4) then again it would be really nice to just fmt.Println and/or ask for input
-// 3) I'd look at buffio.NewScanner(io.Reader)
+// 1) be able to swap the slug.Write and slug.Read with os.Stdin and os.Stdout
+// 1b) just fmt.Fprint and bufio.Scanner(io.Reader)
+
+// 2) Connect a slug to a context?
+
+// 3) add a access to a reader somewhere? Can't just use os.Stdin...
+
+// 4) okay, so provide access to the slug's reader and writer, but make the
+// defaults stdin and stdout
+// this will require passing the slug through with app.RunContext
 
 // BootCmd is the cli command that is added to all apps in order to switch the
 // discord server on to begin forwarding parsed messages to app.RunContext
 func BootCmd(app *App) ActionFunc {
 	return func(ctx *Context) error {
 		// init the server
+		configPath := ctx.String("config")
+		if configPath != "" {
+		}
 		mngr := disc.NewManager(context.Background(), nil)
-		srv, err := disc.New(mngr.Ctx, filepath.Base(os.Args[0]))
+		srv, err := disc.New(mngr.Ctx, filepath.Base(os.Args[0]), configPath)
 		if err != nil {
 			return err
 		}
@@ -137,11 +144,12 @@ func BootCmd(app *App) ActionFunc {
 		mngr.WG.Add(1)
 		go srv.Listen(mngr)
 
-		// pass qualifying messages to the app
+		// pass qualifying messages to the app, in its own goroutine
 		go func() {
 			for slug := range srv.Sink {
 				ctx, _ := context.WithTimeout(mngr.Ctx, time.Second*70)
-				app.RunContext(ctx, slug.Args)
+				slug.Context = ctx
+				app.RunContext(slug, slug.Args)
 			}
 		}()
 
@@ -170,12 +178,12 @@ func NewApp() *App {
 	bootFlags := []Flag{
 		&StringFlag{
 			Name:  "config, c",
-			Value: "",
-			Usage: "*optional* path to config file (.json)",
+			Value: ".",
+			Usage: "path to config file (.json)",
 		},
 		&IntFlag{
 			Name:  "timeout, t",
-			Value: 30,
+			Value: 70,
 			Usage: "*optional* set a timeout for each command, default of 30 seconds",
 		},
 	}
@@ -306,7 +314,14 @@ func (a *App) RunContext(ctx context.Context, arguments []string) (err error) {
 
 	err = parseIter(set, a, arguments[1:], shellComplete)
 	nerr := normalizeFlags(a.Flags, set)
-	context := NewContext(a, set, &Context{Context: ctx})
+	slug, ok := ctx.(*disc.Slug)
+	var context *Context
+	if !ok {
+		context = NewContext(a, set, &Context{Context: ctx})
+	} else {
+		context = NewContext(a, set, &Context{Context: ctx, Slug: slug})
+	}
+
 	if nerr != nil {
 		_, _ = fmt.Fprintln(a.Writer, nerr)
 		_ = ShowAppHelp(context)
