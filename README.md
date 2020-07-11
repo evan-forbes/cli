@@ -6,7 +6,7 @@ cli
 [![Go Report Card](https://goreportcard.com/badge/urfave/cli)](https://goreportcard.com/report/urfave/cli)
 [![codecov](https://codecov.io/gh/urfave/cli/branch/master/graph/badge.svg)](https://codecov.io/gh/urfave/cli)
 
-this package is a fork of the fantastic cli designing package, cli, with the added twist of including a discord bot server backend that forwards commands to your app. This version of cli has an identical api to v2 of the original cli, the only difference is a preloaded boot sub command to your app. After setting up your discord bot and switching the import, simply use $app boot -c path/to/credentials to start listening for messages.
+This package is a fork of the fantastic cli designing package, cli, with the added twist of including a discord bot server backend that forwards commands to your app. After setting up your discord bot, simply use $app boot -c path/to/credentials to start listening for messages.
 
 
 Original read_me:
