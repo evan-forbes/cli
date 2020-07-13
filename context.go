@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/urfave/cli/v2/disc"
+	"github.com/evan-forbes/cli/disc"
 )
 
 // Context is a type that is passed through to

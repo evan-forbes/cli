@@ -4,11 +4,11 @@ cli
 [![GoDoc](https://godoc.org/github.com/urfave/cli?status.svg)](https://godoc.org/github.com/urfave/cli)
 [![Go Report Card](https://goreportcard.com/badge/evan-forbes/cli)](https://goreportcard.com/report/evan-forbes/cli)
 
-This package is a fork of the fantastic command line interface designing package, [cli](github.comurfave/cli), with the automatic added ability to pass commands via discord to an external server running your cli app.
+This fork of the fantastic command line interface designing package, [cli](github.comurfave/cli), has the added ability to design apps that work both as a command line app and a discord bot.
 
 ```go
 // Echo reads the response from the user and writes it back.
-// fullfills. cli.ActionFunc
+// fullfills cli.ActionFunc
 func Echo(ctx *cli.Context) error {
     var input []byte 
     _, err := ctx.Read(input)
@@ -34,7 +34,7 @@ then in discord, call the command as just as we just did in a cli app, except pu
 
 !echo hiya
       
-      hiya --Bot
+hiya --Bot
 
 
 ## Usage 

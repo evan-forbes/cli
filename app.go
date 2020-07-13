@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/urfave/cli/v2/disc"
+	"github.com/evan-forbes/cli/disc"
 )
 
 var (
