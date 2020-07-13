@@ -6,6 +6,8 @@ cli
 
 This fork of the fantastic command line interface designing package, [cli](github.comurfave/cli), has the added ability to design apps that work both as a command line app and a discord bot.
 
+Design your app as if your were writing a normal cli app, except instead of using os.Stdout and os.Stdin to communicate with your user, use the context passed into your cli.ActionFunc as a io.Reader and io.Writer. The context will forward what you write to discord
+
 ```go
 // Echo reads the response from the user and writes it back.
 // fullfills cli.ActionFunc
@@ -13,7 +15,7 @@ func Echo(ctx *cli.Context) error {
     var input []byte 
     _, err := ctx.Read(input)
     if err != nil {
-      return error
+      return err
     }
     _, err = ctx.Write(input)
     return err

@@ -79,6 +79,10 @@ func (s *Server) mainHandler(ss *discordgo.Session, m *discordgo.MessageCreate) 
 	s.Sink <- *slug
 }
 
+func parseArgs(input string) []string {
+	return strings.Split(input)
+}
+
 //////////////////////////////////////////////////
 //  	Conversations
 ///////////////////////////////////////////////

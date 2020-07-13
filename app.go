@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/evan-forbes/cli/disc"
+	"github.com/urfave/cli/v2/disc"
 )
 
 var (
@@ -149,6 +149,7 @@ func BootCmd(app *App) ActionFunc {
 			for slug := range srv.Sink {
 				ctx, _ := context.WithTimeout(mngr.Ctx, time.Second*70)
 				slug.Context = ctx
+				fmt.Println("args", slug.Args)
 				app.RunContext(slug, slug.Args)
 			}
 		}()
@@ -177,9 +178,10 @@ func NewApp() *App {
 	// bootFlags are the flags for boo
 	bootFlags := []Flag{
 		&StringFlag{
-			Name:  "config, c",
-			Value: ".",
-			Usage: "path to config file (.json)",
+			Name:    "config, c",
+			Aliases: []string{"c"},
+			Value:   ".",
+			Usage:   "path to config file (.json)",
 		},
 		&IntFlag{
 			Name:  "timeout, t",
