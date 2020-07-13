@@ -2,14 +2,48 @@ cli
 ===
 
 [![GoDoc](https://godoc.org/github.com/urfave/cli?status.svg)](https://godoc.org/github.com/urfave/cli)
-[![codebeat](https://codebeat.co/badges/0a8f30aa-f975-404b-b878-5fab3ae1cc5f)](https://codebeat.co/projects/github-com-urfave-cli)
-[![Go Report Card](https://goreportcard.com/badge/urfave/cli)](https://goreportcard.com/report/urfave/cli)
-[![codecov](https://codecov.io/gh/urfave/cli/branch/master/graph/badge.svg)](https://codecov.io/gh/urfave/cli)
+[![Go Report Card](https://goreportcard.com/badge/evan-forbes/cli)](https://goreportcard.com/report/evan-forbes/cli)
 
-this package is a fork of the fantastic cli designing package, cli, with the added twist of including a discord bot server backend that forwards commands to your app. This version of cli has an identical api to v2 of the original cli, the only difference is a preloaded boot sub command to your app. After setting up your discord bot and switching the import, simply use $app boot -c path/to/credentials to start listening for messages.
+This fork of the fantastic command line interface designing package, [cli](github.comurfave/cli), has the added ability to design apps that work both as a command line app and a discord bot.
+
+```go
+// Echo reads the response from the user and writes it back.
+// fullfills cli.ActionFunc
+func Echo(ctx *cli.Context) error {
+    var input []byte 
+    _, err := ctx.Read(input)
+    if err != nil {
+      return error
+    }
+    _, err = ctx.Write(input)
+    return err
+}
+```
+
+if using as a normal cli app
+```
+$ echo Hiya
+> Hiya
+```
+if using as a discord bot, use the preloaded boot sub command to begin listening for commands from discord from your server
+```
+$ echo boot -c path/to/discord/credentials
+```
+
+then in discord, call the command as just as we just did in a cli app, except put the "!" in front of your app's name
+
+!echo hiya
+      
+hiya --Bot
+
+
+## Usage 
+
+design your cli app as one would normally (see original readme below). The only api difference, is that the *cli.Context passed into each cli.ActionFunc is now an io.Reader and io.Writer. When being used as a normal cli app, these readers and writers are os.Stdin and os.Stout. However, when being used as a discord bot, they read and write messages to the discord user.
 
 
 Original read_me:
+
 cli is a simple, fast, and fun package for building command line apps in Go. The
 goal is to enable developers to write fast and distributable command line
 applications in an expressive way.

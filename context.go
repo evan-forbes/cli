@@ -1,11 +1,15 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
+
+	"github.com/urfave/cli/v2/disc"
 )
 
 // Context is a type that is passed through to
@@ -19,6 +23,7 @@ type Context struct {
 	shellComplete bool
 	flagSet       *flag.FlagSet
 	parentContext *Context
+	Slug          *disc.Slug
 }
 
 // NewContext creates a new context. For use in when invoking an App or Command action.
@@ -39,6 +44,29 @@ func NewContext(app *App, set *flag.FlagSet, parentCtx *Context) *Context {
 	}
 
 	return c
+}
+
+// Write will write to the appropriate place, either in discord or the
+// os.Stdout, while fullfilling io.Writer
+func (c *Context) Write(in []byte) (int, error) {
+	if c.Slug == nil {
+		return os.Stdout.Write(in)
+	}
+	return c.Slug.Write(in)
+}
+
+// Read looks for input from either the discord channel or os.Stdin depending on
+// the context while fullfilling the io.Reader interface
+func (c *Context) Read(out []byte) (int, error) {
+	if c.Slug != nil {
+		return c.Slug.Read(out)
+	}
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		out = scanner.Bytes()
+		return len(out), nil
+	}
+	return 0, scanner.Err()
 }
 
 // NumFlags returns the number of flags set

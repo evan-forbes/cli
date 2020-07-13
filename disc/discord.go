@@ -12,36 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// usuage
-
-/*
-func cliCommand(ctx cli.Context) error {
-	// some code
-}
-
-func main() {
-	app := cli.NewApp()
-	log.Fatal()
-}
-
-use the normal usage of the cli package, just switch the import
-so I need to modify cli.App
-	// use the discord type as an api to use the discord server
-
-// changes to cli.Context
-	- cli.Context should wrap around the discordgo.Session
-
-// change the cli.NewApp function to make a discord cli app
-
-1) server boots up and connects to discord
-2) wrap the needed discord api stuff into the cli.Context
-3) pass args to the app.RunContext(ctx, args)
-4) run like normal!
-
-
-
-*/
-
 // Server listens for discord messages and forwards incoming commands via the
 // cli.App.RunContext()
 type Server struct {
@@ -49,14 +19,15 @@ type Server struct {
 	ctx     context.Context
 	name    string
 	waiting map[string]*Slug
+	config  Config
 	Sink    chan Slug
 }
 
 // New inits a connection to the discord server with provided creds
-func New(ctx context.Context, name string) (*Server, error) {
-	crds, err := configs()
+func New(ctx context.Context, name string, path string) (*Server, error) {
+	crds, err := configs(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "failure to read creds during server init")
+		return nil, errors.Wrap(err, "failure to read config during server init")
 	}
 	dg, err := discordgo.New("Bot " + crds.Token)
 	if err != nil {
@@ -66,6 +37,8 @@ func New(ctx context.Context, name string) (*Server, error) {
 	out := Server{
 		disc: dg,
 		ctx:  ctx,
+		Sink: make(chan Slug, 10),
+		name: name,
 	}
 	out.disc.AddHandler(out.mainHandler)
 	return &out, nil
@@ -76,24 +49,29 @@ func New(ctx context.Context, name string) (*Server, error) {
 func (s *Server) mainHandler(ss *discordgo.Session, m *discordgo.MessageCreate) {
 	// discord app name
 	name := fmt.Sprintf("!%s", s.name)
+
 	// ignore self posts
 	if m.Author.ID == ss.State.User.ID {
 		return
 	}
+
 	// check is the server is waiting on a response from the user
 	waitingSlug, has := s.waiting[fmt.Sprintf("%s%s", m.ChannelID, m.Author.Username)]
 	if has {
 		// forward response to the slug
-		waitingSlug.Response <- m.Content
+		waitingSlug.response <- m.Content
 		return
 	}
+
 	// ignore everything else that doesn't include the command
 	if !strings.Contains(m.Content, name) {
 		return
 	}
+
 	// do a quick parse for args
 	index := strings.Index(m.Content, name)
 	args := strings.Split(m.Content[index+len(name):], " ")
+
 	// create a new slug
 	slug := s.NewSlug(m, args)
 
@@ -108,17 +86,18 @@ func (s *Server) mainHandler(ss *discordgo.Session, m *discordgo.MessageCreate) 
 // Slug contains data pertaining to a conversation with a user and fullfills the
 // io.Reader and io.Writer interfaces
 type Slug struct {
+	context.Context
 	ChanID   string
 	User     string
 	Args     []string
 	srv      *Server
-	Response chan string
+	response chan string
 }
 
 // NewSlug issues a *Slug
 func (s *Server) NewSlug(m *discordgo.MessageCreate, args []string) *Slug {
 	id := fmt.Sprintf("%s%s", m.Author.Username, m.ChannelID)
-	return &Slug{ChanID: id, User: m.Author.Username, srv: s, Args: args}
+	return &Slug{Context: s.ctx, ChanID: id, User: m.Author.Username, srv: s, Args: args}
 }
 
 // ID combines the user's name and channel id to identify a conversion
@@ -139,7 +118,7 @@ func (s *Slug) Read(out []byte) (int, error) {
 	// notify the server
 	s.srv.waiting[s.ID()] = s
 	select {
-	case resp := <-s.Response:
+	case resp := <-s.response:
 		out = []byte(resp)
 		return len(out), nil
 	case <-time.After(time.Minute):
@@ -159,12 +138,11 @@ type config struct {
 	ClientID    string `json:"CLIENT_ID"`
 }
 
-// TODO: change this
-func configs() (*config, error) {
+func configs(path string) (*config, error) {
 	var out config
 	// Ask to unlock credentials
 
-	jsonFile, err := ioutil.ReadFile("/home/evan/.creds/discord.json")
+	jsonFile, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
