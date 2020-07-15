@@ -80,7 +80,7 @@ func (s *Server) mainHandler(ss *discordgo.Session, m *discordgo.MessageCreate) 
 }
 
 func parseArgs(input string) []string {
-	return strings.Split(input)
+	return strings.Split(input, " ")
 }
 
 //////////////////////////////////////////////////

@@ -35,6 +35,7 @@ func NewContext(app *App, set *flag.FlagSet, parentCtx *Context) *Context {
 		if parentCtx.flagSet == nil {
 			parentCtx.flagSet = &flag.FlagSet{}
 		}
+		c.Slug = parentCtx.Slug
 	}
 
 	c.Command = &Command{}
@@ -55,18 +56,31 @@ func (c *Context) Write(in []byte) (int, error) {
 	return c.Slug.Write(in)
 }
 
-// Read looks for input from either the discord channel or os.Stdin depending on
-// the context while fullfilling the io.Reader interface
-func (c *Context) Read(out []byte) (int, error) {
+// Println wraps fmt.Println, diverting to discord when connected.
+func (c *Context) Println(a ...interface{}) {
+	fmt.Println(c.Slug.Args)
+	if c.Slug == nil {
+		fmt.Println(a...)
+		return
+	}
+	for _, b := range a {
+		c.Slug.Write([]byte(fmt.Sprint(b)))
+	}
+}
+
+// Input prints some text, ask, to the user and then collects user input
+func (c *Context) Input(ask string) string {
 	if c.Slug != nil {
-		return c.Slug.Read(out)
+		var out []byte
+		c.Slug.Read(out)
+		return string(out)
 	}
 	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() {
-		out = scanner.Bytes()
-		return len(out), nil
+	fmt.Print("\n", ask)
+	for scanner.Scan() {
+		return scanner.Text()
 	}
-	return 0, scanner.Err()
+	return ""
 }
 
 // NumFlags returns the number of flags set

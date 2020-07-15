@@ -175,6 +175,16 @@ func NewApp() *App {
 		ErrWriter:    os.Stderr,
 	}
 
+	return app
+}
+
+func (a *App) Setup() {
+	if a.didSetup {
+		return
+	}
+
+	a.didSetup = true
+
 	// bootFlags are the flags for boo
 	bootFlags := []Flag{
 		&StringFlag{
@@ -191,23 +201,15 @@ func NewApp() *App {
 	}
 
 	// subcommands
-	app.Commands = []*Command{
-		{
+	a.Commands = append(
+		a.Commands,
+		&Command{
 			Name:   "boot",
 			Usage:  "start forwarding discord messages to appropriate commands",
 			Flags:  bootFlags,
-			Action: BootCmd(app),
+			Action: BootCmd(a),
 		},
-	}
-	return app
-}
-
-func (a *App) Setup() {
-	if a.didSetup {
-		return
-	}
-
-	a.didSetup = true
+	)
 
 	if a.Name == "" {
 		a.Name = filepath.Base(os.Args[0])
