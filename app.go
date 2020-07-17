@@ -301,6 +301,7 @@ func (a *App) Run(arguments []string) (err error) {
 // passed to its commands and sub-commands. Through this, you can
 // propagate timeouts and cancellation requests
 func (a *App) RunContext(ctx context.Context, arguments []string) (err error) {
+	fmt.Println("running args", arguments)
 	a.Setup()
 
 	// handle the completion flag separately from the flagset since

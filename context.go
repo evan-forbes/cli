@@ -58,7 +58,6 @@ func (c *Context) Write(in []byte) (int, error) {
 
 // Println wraps fmt.Println, diverting to discord when connected.
 func (c *Context) Println(a ...interface{}) {
-	fmt.Println(c.Slug.Args)
 	if c.Slug == nil {
 		fmt.Println(a...)
 		return
@@ -69,18 +68,20 @@ func (c *Context) Println(a ...interface{}) {
 }
 
 // Input prints some text, ask, to the user and then collects user input
-func (c *Context) Input(ask string) string {
+func (c *Context) Input(ask string) (string, error) {
 	if c.Slug != nil {
-		var out []byte
-		c.Slug.Read(out)
-		return string(out)
+		_, err := c.Slug.Write([]byte(ask))
+		if err != nil {
+			return "", err
+		}
+		return c.Slug.Read()
 	}
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("\n", ask)
 	for scanner.Scan() {
-		return scanner.Text()
+		return scanner.Text(), nil
 	}
-	return ""
+	return "", nil
 }
 
 // NumFlags returns the number of flags set

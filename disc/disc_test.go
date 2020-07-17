@@ -1,6 +1,8 @@
 package disc
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestParseArgs(t *testing.T) {
 	inputs := []string{"!chip echo dumpling"}

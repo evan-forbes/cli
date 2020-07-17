@@ -20,7 +20,7 @@ type Server struct {
 	name    string
 	waiting map[string]*Slug
 	config  Config
-	Sink    chan Slug
+	Sink    chan *Slug
 }
 
 // New inits a connection to the discord server with provided creds
@@ -35,10 +35,11 @@ func New(ctx context.Context, name string, path string) (*Server, error) {
 		return nil, err
 	}
 	out := Server{
-		disc: dg,
-		ctx:  ctx,
-		Sink: make(chan Slug, 10),
-		name: name,
+		disc:    dg,
+		ctx:     ctx,
+		Sink:    make(chan *Slug, 10),
+		name:    name,
+		waiting: make(map[string]*Slug),
 	}
 	out.disc.AddHandler(out.mainHandler)
 	return &out, nil
@@ -60,6 +61,7 @@ func (s *Server) mainHandler(ss *discordgo.Session, m *discordgo.MessageCreate) 
 	if has {
 		// forward response to the slug
 		waitingSlug.response <- m.Content
+		delete(s.waiting, fmt.Sprintf("%s%s", m.ChannelID, m.Author.Username))
 		return
 	}
 
@@ -76,7 +78,7 @@ func (s *Server) mainHandler(ss *discordgo.Session, m *discordgo.MessageCreate) 
 	slug := s.NewSlug(m, args)
 
 	// pass the args to app.RunContext
-	s.Sink <- *slug
+	s.Sink <- slug
 }
 
 func parseArgs(input string) []string {
@@ -100,8 +102,8 @@ type Slug struct {
 
 // NewSlug issues a *Slug
 func (s *Server) NewSlug(m *discordgo.MessageCreate, args []string) *Slug {
-	id := fmt.Sprintf("%s%s", m.Author.Username, m.ChannelID)
-	return &Slug{Context: s.ctx, ChanID: id, User: m.Author.Username, srv: s, Args: args}
+	// id := fmt.Sprintf("%s%s", m.Author.Username, m.ChannelID)
+	return &Slug{Context: s.ctx, ChanID: m.ChannelID, User: m.Author.Username, srv: s, Args: args, response: make(chan string, 1)}
 }
 
 // ID combines the user's name and channel id to identify a conversion
@@ -118,16 +120,17 @@ func (s *Slug) Write(in []byte) (int, error) {
 
 // Read fullfills the io.Reader interface, which asks the discord channel of
 // origin for input
-func (s *Slug) Read(out []byte) (int, error) {
+func (s *Slug) Read() (string, error) {
 	// notify the server
 	s.srv.waiting[s.ID()] = s
+	fmt.Println("set the waiting slug")
 	select {
 	case resp := <-s.response:
-		out = []byte(resp)
-		return len(out), nil
+		fmt.Println()
+		return resp, nil
 	case <-time.After(time.Minute):
 		s.Write([]byte("no input detected, aborting"))
-		return 0, errors.New("user did not respond within 1 minute, aborting")
+		return "", errors.New("user did not respond within 1 minute, aborting")
 	}
 }
 
