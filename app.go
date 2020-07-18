@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -144,19 +145,22 @@ func BootCmd(app *App) ActionFunc {
 		mngr.WG.Add(1)
 		go srv.Listen(mngr)
 
-		// pass qualifying messages to the app, in its own goroutine
-		go func() {
-			for slug := range srv.Sink {
-				ctx, _ := context.WithTimeout(mngr.Ctx, time.Second*70)
-				slug.Context = ctx
-				fmt.Println("args", slug.Args)
-				app.RunContext(slug, slug.Args)
+		for {
+			select {
+			case <-mngr.Done():
+				mngr.WG.Wait()
+				return nil
+			case slug := <-srv.Sink:
+				go func() {
+					ctx, _ := context.WithTimeout(mngr.Ctx, time.Second*70)
+					slug.Context = ctx
+					err := app.RunContext(slug, slug.Args)
+					if err != nil {
+						log.Print(err)
+					}
+				}()
 			}
-		}()
-
-		// wait until everything is done
-		mngr.WG.Wait()
-		return nil
+		}
 	}
 }
 
