@@ -45,6 +45,11 @@ func New(ctx context.Context, name string, path string) (*Server, error) {
 	return &out, nil
 }
 
+func (s *Server) Message(chanID, msg string) error {
+	_, err := s.disc.ChannelMessageSend(chanID, msg)
+	return err
+}
+
 // mainHandler filters messages from discord passing all qualifying messages as
 // command line input into an instance of the app
 func (s *Server) mainHandler(ss *discordgo.Session, m *discordgo.MessageCreate) {
