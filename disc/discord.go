@@ -45,6 +45,7 @@ func New(ctx context.Context, name string, path string) (*Server, error) {
 	return &out, nil
 }
 
+// Message sends a string directly to a channel
 func (s *Server) Message(chanID, msg string) error {
 	_, err := s.disc.ChannelMessageSend(chanID, msg)
 	return err
