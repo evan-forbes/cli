@@ -152,10 +152,15 @@ func BootCmd(app *App) ActionFunc {
 				return nil
 			case slug := <-srv.Sink:
 				go func() {
+					// there shouldn't be nil slugs, but when shutting down one gets in...
+					if slug == nil {
+						return
+					}
 					ctx, _ := context.WithTimeout(mngr.Ctx, time.Second*70)
 					slug.Context = ctx
 					err := app.RunContext(slug, slug.Args)
 					if err != nil {
+						slug.Write([]byte(err.Error()))
 						log.Print(err)
 					}
 				}()

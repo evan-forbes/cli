@@ -38,12 +38,18 @@ then in discord, call the command as just as we just did in a cli app, except pu
       
 hiya --Bot
 
-
 ## Usage 
 
-design your cli app as one would normally (see original readme below). The only api difference, is that the *cli.Context passed into each cli.ActionFunc is now an io.Reader and io.Writer. When being used as a normal cli app, these readers and writers are os.Stdin and os.Stout. However, when being used as a discord bot, they read and write messages to the discord user.
+design your cli app as one would normally (see original readme below). The only api difference, is that the *cli.Context passed into each cli.ActionFunc is an io.Writer. When being used as a normal cli app, these readers and writers are os.Stdin and os.Stout. However, when being used as a discord bot, they read and write messages to the discord user.
 
-
+## Install
+```
+go get github.com/evan-forbes/cli
+```
+and in your go.mod file, add
+```
+replace github.com/urfave/cli/v2 => $GOPATH/src/github.com/evan-forbes/cli
+```
 Original read_me:
 
 cli is a simple, fast, and fun package for building command line apps in Go. The
