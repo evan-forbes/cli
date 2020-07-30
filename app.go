@@ -100,6 +100,7 @@ type App struct {
 	Disc *disc.Server
 
 	didSetup bool
+	Running  bool
 }
 
 // Tries to find out when this binary was compiled.
@@ -128,6 +129,10 @@ func compileTime() time.Time {
 // discord server on to begin forwarding parsed messages to app.RunContext
 func BootCmd(app *App) ActionFunc {
 	return func(ctx *Context) error {
+		if app.Running {
+			return nil
+		}
+		app.Running = true
 		// init the server
 		configPath := ctx.String("config")
 		if configPath != "" {
@@ -160,7 +165,7 @@ func BootCmd(app *App) ActionFunc {
 					slug.Context = ctx
 					err := app.RunContext(slug, slug.Args)
 					if err != nil {
-						slug.Write([]byte(err.Error()))
+						// slug.Write([]byte(err.Error()))
 						log.Print(err)
 					}
 				}()
@@ -214,7 +219,7 @@ func (a *App) Setup() {
 		a.Commands,
 		&Command{
 			Name:   "boot",
-			Usage:  "start forwarding discord messages to appropriate commands",
+			Usage:  "start forwarding discord messages to appropriate commands (don't run this)",
 			Flags:  bootFlags,
 			Action: BootCmd(a),
 		},
