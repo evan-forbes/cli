@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,10 @@ var helpCommand = &Command{
 	Usage:     "Shows a list of commands or help for one command",
 	ArgsUsage: "[command]",
 	Action: func(c *Context) error {
+		fmt.Println("running help command")
+		if c.Slug == nil {
+			fmt.Println("slug is nil")
+		}
 		args := c.Args()
 		if args.Present() {
 			return ShowCommandHelp(c, args.First())
@@ -72,13 +77,19 @@ func ShowAppHelpAndExit(c *Context, exitCode int) {
 
 // ShowAppHelp is an action that displays the help.
 func ShowAppHelp(c *Context) error {
+	var wr io.Writer
+	if c.Slug != nil {
+		wr = c.Slug
+	} else {
+		wr = c.App.Writer
+	}
 	template := c.App.CustomAppHelpTemplate
 	if template == "" {
 		template = AppHelpTemplate
 	}
 
 	if c.App.ExtraInfo == nil {
-		HelpPrinter(c.App.Writer, template, c.App)
+		HelpPrinter(wr, template, c.App)
 		return nil
 	}
 
@@ -88,12 +99,6 @@ func ShowAppHelp(c *Context) error {
 		}
 	}
 	// if there is a slug present, switch to writing using that slug
-	var wr io.Writer
-	if c.Slug != nil {
-		wr = c.Slug
-	} else {
-		wr = c.App.Writer
-	}
 	HelpPrinterCustom(wr, template, c.App, customAppData())
 
 	return nil
@@ -281,10 +286,9 @@ func printHelpCustom(out io.Writer, templ string, data interface{}, customFuncs 
 	for key, value := range customFuncs {
 		funcMap[key] = value
 	}
-
-	w := tabwriter.NewWriter(out, 1, 8, 2, ' ', 0)
+	var wr bytes.Buffer
+	w := tabwriter.NewWriter(&wr, 1, 8, 2, ' ', 0)
 	t := template.Must(template.New("help").Funcs(funcMap).Parse(templ))
-
 	err := t.Execute(w, data)
 	if err != nil {
 		// If the writer is closed, t.Execute will fail, and there's nothing
@@ -295,6 +299,7 @@ func printHelpCustom(out io.Writer, templ string, data interface{}, customFuncs 
 		return
 	}
 	_ = w.Flush()
+	out.Write(wr.Bytes())
 }
 
 func printHelp(out io.Writer, templ string, data interface{}) {

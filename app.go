@@ -143,6 +143,8 @@ func BootCmd(app *App) ActionFunc {
 			return err
 		}
 
+		app.Disc = srv
+
 		// Listen for cancels via ctrl + C
 		go mngr.Listen()
 
