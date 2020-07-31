@@ -87,7 +87,14 @@ func ShowAppHelp(c *Context) error {
 			"ExtraInfo": c.App.ExtraInfo,
 		}
 	}
-	HelpPrinterCustom(c.App.Writer, template, c.App, customAppData())
+	// if there is a slug present, switch to writing using that slug
+	var wr io.Writer
+	if c.Slug != nil {
+		wr = c.Slug
+	} else {
+		wr = c.App.Writer
+	}
+	HelpPrinterCustom(wr, template, c.App, customAppData())
 
 	return nil
 }
@@ -188,8 +195,14 @@ func ShowCommandHelpAndExit(c *Context, command string, code int) {
 // ShowCommandHelp prints help for the given command
 func ShowCommandHelp(ctx *Context, command string) error {
 	// show the subcommand help for a command with subcommands
+	var wr io.Writer
+	if ctx.Slug != nil {
+		wr = ctx.Slug
+	} else {
+		wr = ctx.App.Writer
+	}
 	if command == "" {
-		HelpPrinter(ctx.App.Writer, SubcommandHelpTemplate, ctx.App)
+		HelpPrinter(wr, SubcommandHelpTemplate, ctx.App)
 		return nil
 	}
 
@@ -200,7 +213,7 @@ func ShowCommandHelp(ctx *Context, command string) error {
 				templ = CommandHelpTemplate
 			}
 
-			HelpPrinter(ctx.App.Writer, templ, c)
+			HelpPrinter(wr, templ, c)
 
 			return nil
 		}
