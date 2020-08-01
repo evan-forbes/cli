@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,7 +17,6 @@ var helpCommand = &Command{
 	Usage:     "Shows a list of commands or help for one command",
 	ArgsUsage: "[command]",
 	Action: func(c *Context) error {
-		fmt.Println("running help command")
 		args := c.Args()
 		if args.Present() {
 			return ShowCommandHelp(c, args.First())
@@ -223,7 +221,8 @@ func ShowCommandHelp(ctx *Context, command string) error {
 	}
 
 	if ctx.App.CommandNotFound == nil {
-		return errors.New(fmt.Sprintf("No help topic for '%v'", command))
+		ShowAppHelp(ctx)
+		return nil
 	}
 
 	ctx.App.CommandNotFound(ctx, command)
