@@ -221,6 +221,7 @@ func ShowCommandHelp(ctx *Context, command string) error {
 	}
 
 	if ctx.App.CommandNotFound == nil {
+		ctx.Println(fmt.Sprintf("unknown command: %s", command))
 		ShowAppHelp(ctx)
 		return nil
 	}
